@@ -1,0 +1,27 @@
+{
+  "name": "copy-rollup",
+  "version": "1.0.0",
+  "description": "拷贝自 rollup 初版源码，并对其进行了部分修改",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/woai3c/copy-rollup.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/woai3c/copy-rollup/issues"
+  },
+  "homepage": "https://github.com/woai3c/copy-rollup#readme",
+  "dependencies": {
+    "acorn": "^8.0.1",
+    "magic-string": "^0.25.7"
+  },
+  "devDependencies": {
+    "jest": "^26.4.2"
+  }
+}
