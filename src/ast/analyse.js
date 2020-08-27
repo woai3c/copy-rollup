@@ -1,28 +1,27 @@
-import walk from './walk'
-import Scope from './Scope'
-import { getName } from '../utils/map-helpers'
-import { has } from '../utils/object'
+const walk = require('./walk')
+const Scope = require('./scope')
+const { getName } = require('../utils/map-helpers')
 
 // 对 AST 进行分析，按节点层级赋予对应的作用域，并找出有哪些依赖项和对依赖项作了哪些修改
-export default function analyse (ast, magicString, module) {
+function analyse(ast, magicString, module) {
 	let scope = new Scope()
 	let currentTopLevelStatement
 
-	function addToScope (declarator) {
+	function addToScope(declarator) {
 		var name = declarator.id.name
 		scope.add(name, false)
 
 		if (!scope.parent) {
-			currentTopLevelStatement._defines[ name ] = true
+			currentTopLevelStatement._defines[name] = true
 		}
 	}
 
-	function addToBlockScope (declarator) {
+	function addToBlockScope(declarator) {
 		var name = declarator.id.name
 		scope.add(name, true)
 
 		if (!scope.parent) {
-			currentTopLevelStatement._defines[ name ] = true
+			currentTopLevelStatement._defines[name] = true
 		}
 	}
 
@@ -42,7 +41,7 @@ export default function analyse (ast, magicString, module) {
 			_included:         { value: false, writable: true },
 			_module:           { value: module },
 			_source:           { value: magicString.snip(statement.start, statement.end) }, // TODO don't use snip, it's a waste of memory
-			_margin:           { value: [ 0, 0 ] },
+			_margin:           { value: [0, 0] },
 			_leadingComments:  { value: [] },
 			_trailingComment:  { value: null, writable: true },
 		})
@@ -52,7 +51,7 @@ export default function analyse (ast, magicString, module) {
 		// attach leading comment
 		// 为上一个句子添加尾注释，为当前句子添加头注释
 		do {
-			const comment = module.comments[ commentIndex ]
+			const comment = module.comments[commentIndex]
 
 			if (!comment || (comment.end > statement.start)) break
 
@@ -68,7 +67,7 @@ export default function analyse (ast, magicString, module) {
 
 			commentIndex += 1
 			trailing = false
-		} while (module.comments[ commentIndex ])
+		} while (module.comments[commentIndex])
 
 		// determine margin
 		const previousEnd = previousStatement ? (previousStatement._trailingComment || previousStatement).end : 0
@@ -83,9 +82,6 @@ export default function analyse (ast, magicString, module) {
 		walk(statement, {
 			enter (node) {
 				let newScope
-
-				magicString.addSourcemapLocation(node.start)
-
 				switch (node.type) {
 					case 'FunctionExpression':
 					case 'FunctionDeclaration':
@@ -117,7 +113,7 @@ export default function analyse (ast, magicString, module) {
 					case 'CatchClause':
 						newScope = new Scope({
 							parent: scope,
-							params: [ node.param.name ],
+							params: [node.param.name],
 							block: true
 						})
 
@@ -170,14 +166,14 @@ export default function analyse (ast, magicString, module) {
 
 				const definingScope = scope.findDefiningScope(node.name)
 
-				if ((!definingScope || definingScope.depth === 0) && !statement._defines[ node.name ]) {
-					statement._dependsOn[ node.name ] = true
+				if ((!definingScope || definingScope.depth === 0) && !statement._defines[node.name]) {
+					statement._dependsOn[node.name] = true
 				}
 			}
 
 		}
 		// 检查有没修改依赖
-		function checkForWrites (node) {
+		function checkForWrites(node) {
 			function addNode (node, disallowImportReassignments) {
 				while (node.type === 'MemberExpression') {
 					node = node.object
@@ -187,7 +183,7 @@ export default function analyse (ast, magicString, module) {
 					return
 				}
 
-				statement._modifies[ node.name ] = true
+				statement._modifies[node.name] = true
 			}
 
 			// 检查 a = 1 + 2 中的 a 是否被修改
@@ -228,3 +224,5 @@ export default function analyse (ast, magicString, module) {
 
 	ast._scope = scope
 }
+
+module.exports = analyse

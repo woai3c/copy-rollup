@@ -1,11 +1,17 @@
-export function getName (x) {
+function getName(x) {
 	return x.name
 }
 
-export function quoteId (x) {
+function quoteId(x) {
 	return `'${x.id}'`
 }
 
-export function req (x) {
+function req(x) {
 	return `require('${x.id}')`
+}
+
+module.exports = {
+	getName,
+	quoteId,
+	req
 }

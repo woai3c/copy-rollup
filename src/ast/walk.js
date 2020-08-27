@@ -1,7 +1,7 @@
 let shouldSkip
 let shouldAbort
 // 对 AST 的节点调用 enter() 和 leave() 函数，如果有子节点将递归调用
-export default function walk (ast, { enter, leave }) {
+function walk (ast, { enter, leave }) {
 	shouldAbort = false
 	visit(ast, null, enter, leave)
 }
@@ -28,8 +28,8 @@ function visit (node, parent, enter, leave) {
 		if (shouldSkip || shouldAbort) return
 	}
 
-	let keys = childKeys[ node.type ] || (
-		childKeys[ node.type ] = Object.keys(node).filter(key => typeof node[ key ] === 'object')
+	let keys = childKeys[node.type] || (
+		childKeys[node.type] = Object.keys(node).filter(key => typeof node[key] === 'object')
 	)
 
 	let key, value, i, j
@@ -37,7 +37,7 @@ function visit (node, parent, enter, leave) {
 	i = keys.length
 	while (i--) {
 		key = keys[i]
-		value = node[ key ]
+		value = node[key]
 
 		if (isArray(value)) {
 			j = value.length
@@ -55,3 +55,5 @@ function visit (node, parent, enter, leave) {
 		leave(node, parent)
 	}
 }
+
+module.exports = walk

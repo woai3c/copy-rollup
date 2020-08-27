@@ -1,10 +1,10 @@
 // 将数组每一项当成参数传给 callback 执行，最后将结果用 promise 返回
-export function sequence (arr, callback) {
+function sequence (arr, callback) {
 	const len = arr.length
 	const results = new Array(len)
-	const promise = Promise.resolve()
+	let promise = Promise.resolve()
 
-	function next (i) {
+	function next(i) {
 		return promise
 			.then(() => callback(arr[i], i))
 			.then(result => results[i] = result)
@@ -17,3 +17,5 @@ export function sequence (arr, callback) {
 
 	return promise.then(() => results)
 }
+
+module.exports = { sequence }

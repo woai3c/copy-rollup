@@ -2,12 +2,14 @@ const reservedWords = 'break case class catch const continue debugger default de
 const builtins = 'Infinity NaN undefined null true false eval uneval isFinite isNaN parseFloat parseInt decodeURI decodeURIComponent encodeURI encodeURIComponent escape unescape Object Function Boolean Symbol Error EvalError InternalError RangeError ReferenceError SyntaxError TypeError URIError Number Math Date String RegExp Array Int8Array Uint8Array Uint8ClampedArray Int16Array Uint16Array Int32Array Uint32Array Float32Array Float64Array Map Set WeakMap WeakSet SIMD ArrayBuffer DataView JSON Promise Generator GeneratorFunction Reflect Proxy Intl'.split(' ');
 
 let blacklisted = {};
-reservedWords.concat(builtins).forEach(word => blacklisted[ word ] = true);
+reservedWords.concat(builtins).forEach(word => blacklisted[word] = true);
 
 // 将非法标识符转为合法标识符
-export default function makeLegalIdentifier (str) {
+function makeLegalIdentifier(str) {
 	str = str.replace(/[^$_a-zA-Z0-9]/g, '_');
-	if (/\d/.test(str[0]) || blacklisted[ str ]) str = `_${str}`;
+	if (/\d/.test(str[0]) || blacklisted[str]) str = `_${str}`;
 
 	return str;
 }
+
+module.exports = makeLegalIdentifier

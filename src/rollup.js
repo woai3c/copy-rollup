@@ -12,7 +12,9 @@ function rollup(entry, options) {
 					format: options.format,
 				})
 
-				return fs.writeFile(dest, code)
+				return fs.writeFile(dest, code, err => {
+                    if (err) throw err
+                })
             }
         }
     })

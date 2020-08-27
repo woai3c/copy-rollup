@@ -1,7 +1,13 @@
-export const keys = Object.keys
+const keys = Object.keys
 
-export const hasOwnProp = Object.prototype.hasOwnProperty
+const hasOwnProp = Object.prototype.hasOwnProperty
 
-export function has(obj, prop) {
+function has(obj, prop) {
 	return hasOwnProp.call(obj, prop)
+}
+
+module.exports = {
+	keys,
+	hasOwnProp,
+	has,
 }

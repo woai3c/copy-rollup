@@ -1,8 +1,8 @@
-import walk from '../ast/walk'
-import { has } from './object'
+const walk = require('../ast/walk')
+const has = require('./object')
 
 // 重写 node 名称
-export default function replaceIdentifiers (statement, snippet, names) {
+function replaceIdentifiers(statement, snippet, names) {
 	const replacementStack = [names]
 	const keys = Object.keys(names)
 
@@ -54,3 +54,5 @@ export default function replaceIdentifiers (statement, snippet, names) {
 		}
 	})
 }
+
+module.exports = replaceIdentifiers

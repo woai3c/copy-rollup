@@ -1,7 +1,5 @@
-import amd from './amd'
-import cjs from './cjs'
-import es6 from './es6'
-import iife from './iife'
-import umd from './umd'
+const cjs = require('./cjs')
+const es6 = require('./es6')
+const iife = require('./iife')
 
-export default { amd, cjs, es6, iife, umd }
+module.exports = { cjs, es6, iife }

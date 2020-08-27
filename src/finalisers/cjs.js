@@ -1,6 +1,6 @@
-import { keys } from '../utils/object'
+const { keys } = require('../utils/object')
 
-export default function cjs (bundle, magicString, exportMode) {
+function cjs(bundle, magicString, exportMode) {
 	let intro = `'use strict'\n\n`
 
 	// TODO handle empty imports, once they're supported
@@ -25,14 +25,13 @@ export default function cjs (bundle, magicString, exportMode) {
 
 	let exportBlock
 	if (exportMode === 'default' && bundle.entryModule.exports.default) {
-		exportBlock = `module.exports = ${bundle.entryModule.getCanonicalName('default')}`
+		exportBlock = `module.exports = 'default'`
 	} else if (exportMode === 'named') {
 		exportBlock = keys(bundle.entryModule.exports)
 			.map(key => {
-				const specifier = bundle.entryModule.exports[ key ]
-				const name = bundle.entryModule.getCanonicalName(specifier.localName)
+				const specifier = bundle.entryModule.exports[key]
 
-				return `exports.${key} = ${name}`
+				return `exports.${key} = ${specifier.localName}`
 			})
 			.join('\n')
 	}
@@ -43,3 +42,5 @@ export default function cjs (bundle, magicString, exportMode) {
 
 	return magicString
 }
+
+module.exports = cjs

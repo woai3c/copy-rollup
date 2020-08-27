@@ -1,23 +1,32 @@
 const { parse } = require('acorn')
+const analyse = require('./ast/analyse')
+const MagicString = require('magic-string')
+const { has, keys } = require('./utils/object')
+const { sequence } = require('./utils/promise')
+
+const emptyArrayPromise = Promise.resolve([])
 
 class Module {
     constructor({ code, path, bundle }) {
-        this.code = code
+        this.code = new MagicString(code, {
+			filename: path
+		})
+
         this.path = path
         this.bundle = bundle
-        this.comments = []
+        this.suggestedNames = {}
+		this.comments = []
         this.ast = parse(code, {
             ecmaVersion: 6,
             sourceType: 'module',
             onComment: (block, text, start, end) => this.comments.push({ block, text, start, end })
         })
 
-        // console.log(JSON.stringify(this.ast, null, 4))
-        this.analyse()
+		this.analyse()
     }
 
     // 分析导入和导出的模块，将引入的模块和导出的模块填入对应的数组
-    analyse () {
+    analyse() {
 		this.imports = {}
 		this.exports = {}
 
@@ -61,7 +70,7 @@ class Module {
                     // export var foo = 42
                     // export function foo () {}
 					// export { foo } from './foo'
-					source = node.source && node.source.value;
+					source = node.source && node.source.value
 
 					if (node.specifiers.length) {
 						// export { foo, bar, baz }
@@ -69,7 +78,7 @@ class Module {
 							const localName = specifier.local.name
 							const exportedName = specifier.exported.name
 
-							this.exports[ exportedName ] = {
+							this.exports[exportedName] = {
 								localName,
 								exportedName
 							}
@@ -93,10 +102,10 @@ class Module {
 							name = declaration.declarations[0].id.name
 						} else {
 							// export function foo () {}
-							name = declaration.id.name;
+							name = declaration.id.name
 						}
 
-						this.exports[ name ] = {
+						this.exports[name] = {
 							node,
 							localName: name,
 							expression: declaration
@@ -106,14 +115,11 @@ class Module {
 			}
 		})
 
-
-
+		// 调用 ast 目录下的 analyse()
 		analyse(this.ast, this.code, this)
 		// 当前模块下的顶级变量（包括函数声明）
 		this.definedNames = this.ast._scope.names.slice()
-
 		this.canonicalNames = {}
-
 		this.definitions = {}
 		this.definitionPromises = {}
 		this.modifications = {}
@@ -121,18 +127,181 @@ class Module {
 		this.ast.body.forEach(statement => {
 			// 读取当前语句下的变量
 			Object.keys(statement._defines).forEach(name => {
-				this.definitions[ name ] = statement
+				this.definitions[name] = statement
             })
             
 			// 再根据 _modifies 修改它们，_modifies 是在 analyse() 中改变的
 			Object.keys(statement._modifies).forEach(name => {
 				if (!has(this.modifications, name)) {
-					this.modifications[ name ] = []
+					this.modifications[name] = []
 				}
 
-				this.modifications[ name ].push(statement)
+				this.modifications[name].push(statement)
 			})
 		})
+	}
+
+	expandAllStatements(isEntryModule) {
+		let allStatements = []
+
+		return sequence(this.ast.body, statement => {
+			// skip already-included statements
+			if (statement._included) return
+
+			// skip import declarations
+			if (statement.type === 'ImportDeclaration') {
+				// unless they're empty, in which case assume we're importing them for the side-effects
+				// THIS IS NOT FOOLPROOF. Probably need /*rollup: include */ or similar
+				if (!statement.specifiers.length) {
+					return this.bundle.fetchModule(statement.source.value, this.path)
+						.then(module => {
+							statement.module = module
+							return module.expandAllStatements()
+						})
+						.then(statements => {
+							allStatements.push.apply(allStatements, statements)
+						})
+				}
+
+				return
+			}
+
+			// skip `export { foo, bar, baz }`
+			if (statement.type === 'ExportNamedDeclaration' && statement.specifiers.length) {
+				// but ensure they are defined, if this is the entry module
+				if (isEntryModule) {
+					return this.expandStatement(statement)
+						.then(statements => {
+							allStatements.push.apply(allStatements, statements)
+						})
+				}
+
+				return
+			}
+
+			// include everything else
+			return this.expandStatement(statement)
+				.then(statements => {
+					allStatements.push.apply(allStatements, statements)
+				})
+		}).then(() => {
+			return allStatements
+		})
+	}
+
+	expandStatement(statement) {
+		if (statement._included) return emptyArrayPromise
+		statement._included = true
+
+		let result = []
+
+		// We have a statement, and it hasn't been included yet. First, include
+		// the statements it depends on
+		const dependencies = Object.keys(statement._dependsOn)
+
+		return sequence(dependencies, name => {
+			return this.define(name).then(definition => {
+				result.push.apply(result, definition)
+			})
+		})
+
+		// then include the statement itself
+			.then(() => {
+				result.push(statement)
+			})
+
+		// then include any statements that could modify the
+		// thing(s) this statement defines
+			.then(() => {
+				return sequence(keys(statement._defines), name => {
+					const modifications = has(this.modifications, name) && this.modifications[name]
+
+					if (modifications) {
+						return sequence(modifications, statement => {
+							if (!statement._included) {
+								return this.expandStatement(statement)
+									.then(statements => {
+										result.push.apply(result, statements)
+									})
+							}
+						})
+					}
+				})
+			})
+
+		// the `result` is an array of statements needed to define `name`
+			.then(() => {
+				return result
+			})
+	}
+
+	define(name) {
+		// shortcut cycles. TODO this won't work everywhere...
+		if (has(this.definitionPromises, name)) {
+			return emptyArrayPromise
+		}
+
+		let promise
+
+		// The definition for this name is in a different module
+		if (has(this.imports, name)) {
+			const importDeclaration = this.imports[name]
+
+			promise = this.bundle.fetchModule(importDeclaration.source, this.path)
+				.then(module => {
+					importDeclaration.module = module
+
+					if (module.isExternal) {
+						if (importDeclaration.name === 'default') {
+							module.needsDefault = true
+						} else {
+							module.needsNamed = true
+						}
+
+						module.importedByBundle.push(importDeclaration)
+						return emptyArrayPromise
+					}
+
+					if (importDeclaration.name === '*') {
+						return module.expandAllStatements()
+					}
+
+					const exportDeclaration = module.exports[importDeclaration.name]
+
+					if (!exportDeclaration) {
+						throw new Error(`Module ${module.path} does not export ${importDeclaration.name} (imported by ${this.path})`)
+					}
+
+					return module.define(exportDeclaration.localName)
+				})
+		}
+
+		// The definition is in this module
+		else if (name === 'default' && this.exports.default.isDeclaration) {
+			// We have something like `export default foo` - so we just start again,
+			// searching for `foo` instead of default
+			promise = this.define(this.exports.default.name)
+		}
+
+		else {
+			let statement
+
+			if (name === 'default') {
+				// TODO can we use this.definitions[name], as below?
+				statement = this.exports.default.node
+			}
+
+			else {
+				statement = this.definitions[name]
+			}
+
+			if (statement && !statement._included) {
+				promise = this.expandStatement(statement)
+			}
+		}
+
+		this.definitionPromises[name] = promise || emptyArrayPromise
+		return this.definitionPromises[name]
 	}
 }
 

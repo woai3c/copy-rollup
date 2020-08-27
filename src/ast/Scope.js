@@ -1,5 +1,5 @@
 // 作用域
-export default class Scope {
+class Scope {
 	constructor (options) {
 		options = options || {}
 
@@ -35,3 +35,5 @@ export default class Scope {
 		return null
 	}
 }
+
+module.exports = Scope
