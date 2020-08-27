@@ -1,7 +1,8 @@
 const walk = require('../ast/walk')
-const has = require('./object')
+const { has } = require('./object')
 
 // 重写 node 名称
+// 例如 import { resolve } from path; 将 resolve 变为 path.resolve
 function replaceIdentifiers(statement, snippet, names) {
 	const replacementStack = [names]
 	const keys = Object.keys(names)
@@ -11,7 +12,7 @@ function replaceIdentifiers(statement, snippet, names) {
 	}
 
 	walk(statement, {
-		enter (node, parent) {
+		enter(node, parent) {
 			const scope = node._scope
 
 			if (scope) {
@@ -19,7 +20,7 @@ function replaceIdentifiers(statement, snippet, names) {
 				let hasReplacements
 
 				keys.forEach(key => {
-					if (!~scope.names.indexOf(key)) {
+					if (!scope.names.includes(key)) {
 						newNames[key] = names[key]
 						hasReplacements = true
 					}
@@ -46,7 +47,7 @@ function replaceIdentifiers(statement, snippet, names) {
 			}
 		},
 
-		leave (node) {
+		leave(node) {
 			if (node._scope) {
 				replacementStack.pop()
 				names = replacementStack[replacementStack.length - 1]

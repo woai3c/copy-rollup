@@ -235,73 +235,135 @@ class Module {
 			})
 	}
 
-	define(name) {
+	define ( name ) {
 		// shortcut cycles. TODO this won't work everywhere...
-		if (has(this.definitionPromises, name)) {
-			return emptyArrayPromise
+		if ( has( this.definitionPromises, name ) ) {
+			return emptyArrayPromise;
 		}
 
-		let promise
+		let promise;
 
 		// The definition for this name is in a different module
-		if (has(this.imports, name)) {
-			const importDeclaration = this.imports[name]
+		if ( has( this.imports, name ) ) {
+			const importDeclaration = this.imports[ name ];
 
-			promise = this.bundle.fetchModule(importDeclaration.source, this.path)
-				.then(module => {
-					importDeclaration.module = module
+			promise = this.bundle.fetchModule( importDeclaration.source, this.path )
+				.then( module => {
+					importDeclaration.module = module;
 
-					if (module.isExternal) {
-						if (importDeclaration.name === 'default') {
-							module.needsDefault = true
+					// suggest names. TODO should this apply to non default/* imports?
+					if ( importDeclaration.name === 'default' ) {
+						// TODO this seems ropey
+						const localName = importDeclaration.localName;
+						const suggestion = has( this.suggestedNames, localName ) ? this.suggestedNames[ localName ] : localName;
+						module.suggestName( 'default', suggestion );
+					} else if ( importDeclaration.name === '*' ) {
+						const localName = importDeclaration.localName;
+						const suggestion = has( this.suggestedNames, localName ) ? this.suggestedNames[ localName ] : localName;
+						module.suggestName( '*', suggestion );
+						module.suggestName( 'default', `${suggestion}__default` );
+					}
+
+					if ( module.isExternal ) {
+						if ( importDeclaration.name === 'default' ) {
+							module.needsDefault = true;
 						} else {
-							module.needsNamed = true
+							module.needsNamed = true;
 						}
 
-						module.importedByBundle.push(importDeclaration)
-						return emptyArrayPromise
+						module.importedByBundle.push( importDeclaration );
+						return emptyArrayPromise;
 					}
 
-					if (importDeclaration.name === '*') {
-						return module.expandAllStatements()
+					if ( importDeclaration.name === '*' ) {
+						// we need to create an internal namespace
+						if (!this.bundle.internalNamespaceModules.includes(module)) {
+							this.bundle.internalNamespaceModules.push(module)
+						}
+
+						return module.expandAllStatements();
 					}
 
-					const exportDeclaration = module.exports[importDeclaration.name]
+					const exportDeclaration = module.exports[ importDeclaration.name ];
 
-					if (!exportDeclaration) {
-						throw new Error(`Module ${module.path} does not export ${importDeclaration.name} (imported by ${this.path})`)
+					if ( !exportDeclaration ) {
+						throw new Error( `Module ${module.path} does not export ${importDeclaration.name} (imported by ${this.path})` );
 					}
 
-					return module.define(exportDeclaration.localName)
-				})
+					return module.define( exportDeclaration.localName );
+				});
 		}
 
 		// The definition is in this module
-		else if (name === 'default' && this.exports.default.isDeclaration) {
+		else if ( name === 'default' && this.exports.default.isDeclaration ) {
 			// We have something like `export default foo` - so we just start again,
 			// searching for `foo` instead of default
-			promise = this.define(this.exports.default.name)
+			promise = this.define( this.exports.default.name );
 		}
 
 		else {
-			let statement
+			let statement;
 
-			if (name === 'default') {
-				// TODO can we use this.definitions[name], as below?
-				statement = this.exports.default.node
+			if ( name === 'default' ) {
+				// TODO can we use this.definitions[ name ], as below?
+				statement = this.exports.default.node;
 			}
 
 			else {
-				statement = this.definitions[name]
+				statement = this.definitions[ name ];
 			}
 
-			if (statement && !statement._included) {
-				promise = this.expandStatement(statement)
+			if ( statement && !statement._included ) {
+				promise = this.expandStatement( statement );
 			}
 		}
 
-		this.definitionPromises[name] = promise || emptyArrayPromise
-		return this.definitionPromises[name]
+		this.definitionPromises[ name ] = promise || emptyArrayPromise;
+		return this.definitionPromises[ name ];
+	}
+
+	getCanonicalName ( localName ) {
+		if ( has( this.suggestedNames, localName ) ) {
+			localName = this.suggestedNames[ localName ];
+		}
+
+		if ( !has( this.canonicalNames, localName ) ) {
+			let canonicalName;
+
+			if ( has( this.imports, localName ) ) {
+				const importDeclaration = this.imports[ localName ];
+				const module = importDeclaration.module;
+
+				if ( importDeclaration.name === '*' ) {
+					canonicalName = module.suggestedNames[ '*' ];
+				} else {
+					let exporterLocalName;
+
+					if ( module.isExternal ) {
+						exporterLocalName = importDeclaration.name;
+					} else {
+						const exportDeclaration = module.exports[ importDeclaration.name ];
+						exporterLocalName = exportDeclaration.localName;
+					}
+
+					canonicalName = module.getCanonicalName( exporterLocalName );
+				}
+			}
+
+			else {
+				canonicalName = localName;
+			}
+
+			this.canonicalNames[ localName ] = canonicalName;
+		}
+
+		return this.canonicalNames[ localName ];
+	}
+
+	suggestName ( exportName, suggestion ) {
+		if ( !this.suggestedNames[ exportName ] ) {
+			this.suggestedNames[ exportName ] = suggestion;
+		}
 	}
 }
 

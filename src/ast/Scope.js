@@ -24,7 +24,7 @@ class Scope {
 	}
 
 	findDefiningScope (name) {
-		if (~this.names.indexOf(name)) {
+		if (this.names.includes(name)) {
 			return this
 		}
 

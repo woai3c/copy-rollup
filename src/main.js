@@ -1,12 +1,12 @@
-import foo, { two } from './foo'
-import { resolve } from 'path'
+import * as g from './foo'
+import * as path from 'path'
 
 export default function add(a, b) { a + b }
 
 export function test() {}
 
-console.log(foo())
-console.log(resolve)
+console.log(g.foo, g.two)
+console.log(path)
 
 function one() {
     const a = 1
