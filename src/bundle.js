@@ -100,7 +100,7 @@ class Bundle {
 					const canonicalName = statement._module.getCanonicalName(name)
 
 					if (name !== canonicalName) {
-						replacements[ name ] = canonicalName
+						replacements[name] = canonicalName
 					}
 				})
 
@@ -109,40 +109,35 @@ class Bundle {
 			// modify exports as necessary
 			if (/^Export/.test(statement.type)) {
 				// 已经引入到一起打包了，所以不需要这些语句了
-				// skip `export { foo, bar, baz }`
+				// 跳过 `export { foo, bar, baz }` 语句
 				if (statement.type === 'ExportNamedDeclaration' && statement.specifiers.length) {
 					return
 				}
 
 				// 因为已经打包在一起了
 				// 如果引入的模块是 export var foo = 42，就移除 export，变成 var foo = 42
-				// remove `export` from `export var foo = 42`
 				if (statement.type === 'ExportNamedDeclaration' && statement.declaration.type === 'VariableDeclaration') {
 					source.remove(statement.start, statement.declaration.start)
 				}
-				// remove `export` from `export class Foo {...}` or `export default Foo`
-				// TODO default exports need different treatment
+				// `export class Foo {...}` 移除 export
 				else if (statement.declaration.id) {
 					source.remove(statement.start, statement.declaration.start)
 				} else if (statement.type === 'ExportDefaultDeclaration') {
+					const module = statement._module
+					const canonicalName = module.getCanonicalName('default')
 
+					if (statement.declaration.type === 'Identifier' && canonicalName === module.getCanonicalName(statement.declaration.name)) {
+						return
+					}
+
+					source.overwrite(statement.start, statement.declaration.start, `var ${canonicalName} = `)
 				} else {
 					throw new Error('Unhandled export')
 				}
             }
-
+			
+			// 例如 import { resolve } from path; 将 resolve 变为 path.resolve
 			replaceIdentifiers(statement, source, replacements)
-
-			// add leading comments
-			if (statement._leadingComments.length) {
-				const commentBlock = statement._leadingComments.map(comment => {
-					return comment.block ?
-						`/*${comment.text}*/` :
-						`//${comment.text}`
-				}).join('\n')
-
-				magicString.addSource(new MagicString(commentBlock))
-			}
 
 			// 生成空行
 			// add margin
@@ -155,30 +150,25 @@ class Bundle {
 				separator: newLines
 			})
 
-			// add trailing comments
-			const comment = statement._trailingComment
-			if (comment) {
-				const commentBlock = comment.block ?
-					` /*${comment.text}*/` :
-					` //${comment.text}`
-
-				magicString.append(commentBlock)
-			}
-
 			previousMargin = statement._margin[1]
 		})
 
-		// prepend bundle with internal namespaces
-		const indentString = magicString.getIndentString();
-		const namespaceBlock = this.internalNamespaceModules.map( module => {
-			const exportKeys = keys( module.exports );
+		// 这个主要是针对 import * as g from './foo' 语句
+		// 如果 foo 文件有默认导出的函数和 two() 函数，生成的代码如下
+		// var g = {
+		// 	 get default () { return g__default },
+		// 	 get two () { return two }
+		// }
+		const indentString = magicString.getIndentString()
+		const namespaceBlock = this.internalNamespaceModules.map(module => {
+			const exportKeys = keys(module.exports)
 
 			return `var ${module.getCanonicalName('*')} = {\n` +
-				exportKeys.map( key => `${indentString}get ${key} () { return ${module.getCanonicalName(key)}; }` ).join( ',\n' ) +
-			`\n};\n\n`;
-		}).join( '' );
+				exportKeys.map(key => `${indentString}get ${key} () { return ${module.getCanonicalName(key)} }`).join(',\n') +
+			`\n}\n\n`
+		}).join('')
 
-		magicString.prepend( namespaceBlock );
+		magicString.prepend(namespaceBlock)
 
 		const finalise = finalisers[options.format || 'cjs']
 		magicString = finalise(this, magicString.trim(), exportMode, options)
@@ -186,88 +176,75 @@ class Bundle {
 		return { code: magicString.toString() }
     }
     
-    getExportMode (exportMode) {
+    getExportMode(exportMode) {
 		const exportKeys = keys(this.entryModule.exports)
-
-		if (exportMode === 'default') {
-			if (exportKeys.length !== 1 || exportKeys[0] !== 'default') {
-				badExports('default', exportKeys)
-			}
-		} else if (exportMode === 'none' && exportKeys.length) {
-			badExports('none', exportKeys)
-		}
 
 		if (!exportMode || exportMode === 'auto') {
 			if (exportKeys.length === 0) {
+				// 没有导出模块
 				exportMode = 'none'
 			} else if (exportKeys.length === 1 && exportKeys[0] === 'default') {
+				// 只有一个导出模块，并且是 default
 				exportMode = 'default'
 			} else {
 				exportMode = 'named'
 			}
 		}
 
-		if (!/(?:default|named|none)/.test(exportMode)) {
-			throw new Error(`options.exports must be 'default', 'named', 'none', 'auto', or left unspecified (defaults to 'auto')`)
-		}
-
 		return exportMode
 	}
 
-	// 解决冲突，例如两个不同的模块有一个同名变量
-	deconflict () {
-		let definers = {};
-		let conflicts = {};
-
-		// Discover conflicts (i.e. two statements in separate modules both define `foo`)
-		this.statements.forEach( statement => {
-			keys( statement._defines ).forEach( name => {
-				if ( has( definers, name ) ) {
-					conflicts[ name ] = true;
+	deconflict() {
+		const definers = {}
+		const conflicts = {}
+		// 解决冲突，例如两个不同的模块有一个同名函数，则需要对其中一个重命名。
+		this.statements.forEach(statement => {
+			keys(statement._defines).forEach(name => {
+				if (has(definers, name)) {
+					conflicts[name] = true
 				} else {
-					definers[ name ] = [];
+					definers[name] = []
 				}
 
-				// TODO in good js, there shouldn't be duplicate definitions
-				// per module... but some people write bad js
-				definers[ name ].push( statement._module );
-			});
-		});
+				definers[name].push(statement._module)
+			})
+		})
 
-		// Assign names to external modules
-		this.externalModules.forEach( module => {
-			// TODO is this right?
-			let name = module.suggestedNames['*'] || module.suggestedNames.default || module.id
+		// 为外部模块分配名称，例如引入了 path 模块的 resolve 方法，使用时直接用 resolve()
+		// 打包后会变成 path.resolve
+		this.externalModules.forEach(module => {
+			const name = module.suggestedNames['*'] || module.suggestedNames.default || module.id
 
-			if ( has( definers, name ) ) {
-				conflicts[ name ] = true;
+			if (has(definers, name)) {
+				conflicts[name] = true
 			} else {
-				definers[ name ] = [];
+				definers[name] = []
 			}
 
-			definers[ name ].push( module );
-			module.name = name;
-		});
+			definers[name].push(module)
+			module.name = name
+		})
 
 		// Rename conflicting identifiers so they can live in the same scope
-		keys( conflicts ).forEach( name => {
-			const modules = definers[ name ];
+		keys(conflicts).forEach(name => {
+			const modules = definers[name]
 			// 最靠近入口模块的模块可以保持原样，即不改名
-			modules.pop(); // the module closest to the entryModule gets away with keeping things as they are
+			modules.pop()
 			// 其他冲突的模块要改名
-			modules.forEach( module => {
-				const replacement = getSafeName( name );
-				module.rename( name, replacement );
-			});
-		});
+			// 改名就是在冲突的变量前加下划线 _
+			modules.forEach(module => {
+				const replacement = getSafeName(name)
+				module.rename(name, replacement)
+			})
+		})
 
-		function getSafeName ( name ) {
-			while ( has( conflicts, name ) ) {
-				name = `_${name}`;
+		function getSafeName(name) {
+			while (has(conflicts, name)) {
+				name = `_${name}`
 			}
 
-			conflicts[ name ] = true;
-			return name;
+			conflicts[name] = true
+			return name
 		}
 	}
 }

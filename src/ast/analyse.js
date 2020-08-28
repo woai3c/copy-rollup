@@ -27,7 +27,6 @@ function analyse(ast, magicString, module) {
 
 	// first we need to generate comprehensive scope info
 	let previousStatement = null
-	let commentIndex = 0
 
 	// 为每个语句定义作用域，并将父子作用域关联起来
 	ast.body.forEach(statement => {
@@ -40,38 +39,13 @@ function analyse(ast, magicString, module) {
 			_dependsOn:        { value: {} },
 			_included:         { value: false, writable: true },
 			_module:           { value: module },
-			_source:           { value: magicString.snip(statement.start, statement.end) }, // TODO don't use snip, it's a waste of memory
+			_source:           { value: magicString.snip(statement.start, statement.end) },
 			_margin:           { value: [0, 0] },
-			_leadingComments:  { value: [] },
-			_trailingComment:  { value: null, writable: true },
 		})
 
-		let trailing = !!previousStatement
-
-		// attach leading comment
-		// 为上一个句子添加尾注释，为当前句子添加头注释
-		do {
-			const comment = module.comments[commentIndex]
-
-			if (!comment || (comment.end > statement.start)) break
-
-			// attach any trailing comment to the previous statement
-			if (trailing && !/\n/.test(magicString.slice(previousStatement.end, comment.start))) {
-				previousStatement._trailingComment = comment
-			}
-
-			// then attach leading comments to this statement
-			else {
-				statement._leadingComments.push(comment)
-			}
-
-			commentIndex += 1
-			trailing = false
-		} while (module.comments[commentIndex])
-
 		// determine margin
-		const previousEnd = previousStatement ? (previousStatement._trailingComment || previousStatement).end : 0
-		const start = (statement._leadingComments[0] || statement).start
+		const previousEnd = previousStatement ? previousStatement.end : 0
+		const start = statement.start
 
 		const gap = magicString.original.slice(previousEnd, start)
 		const margin = gap.split('\n').length
@@ -86,7 +60,7 @@ function analyse(ast, magicString, module) {
 					case 'FunctionExpression':
 					case 'FunctionDeclaration':
 					case 'ArrowFunctionExpression':
-						let names = node.params.map(getName)
+						const names = node.params.map(getName)
 
 						if (node.type === 'FunctionDeclaration') {
 							addToScope(node)
@@ -199,8 +173,6 @@ function analyse(ast, magicString, module) {
 			else if (node.type === 'CallExpression') {
 				node.arguments.forEach(arg => addNode(arg, false))
 			}
-
-			// TODO UpdateExpressions, method calls?
 		}
 
 		walk(statement, {
@@ -212,9 +184,6 @@ function analyse(ast, magicString, module) {
 
 				checkForReads(node, parent)
 				checkForWrites(node, parent)
-
-				//if (node.type === 'ReturnStatement')
-
 			},
 			leave (node) {
 				if (node._scope) scope = scope.parent

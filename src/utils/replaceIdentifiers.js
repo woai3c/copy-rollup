@@ -38,7 +38,6 @@ function replaceIdentifiers(statement, snippet, names) {
 			if (node.type !== 'Identifier') return
 			if (parent.type === 'MemberExpression' && node !== parent.object) return
 			if (parent.type === 'Property' && node !== parent.value) return
-			// TODO others...?
 
 			const name = has(names, node.name) && names[node.name]
 

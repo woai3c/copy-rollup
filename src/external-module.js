@@ -26,13 +26,13 @@ class ExternalModule {
 		return `${this.name}.${name}`
 	}
 
-	rename (name, replacement) {
-		this.canonicalNames[ name ] = replacement
+	rename(name, replacement) {
+		this.canonicalNames[name] = replacement
 	}
 
-	suggestName (exportName, suggestion) {
-		if (!this.suggestedNames[ exportName ]) {
-			this.suggestedNames[ exportName ] = suggestion
+	suggestName(exportName, suggestion) {
+		if (!this.suggestedNames[exportName]) {
+			this.suggestedNames[exportName] = suggestion
 		}
 	}
 }

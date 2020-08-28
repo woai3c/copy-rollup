@@ -1,22 +1,33 @@
-'use strict';
+'use strict'
 
-var path = require('path');
+var path = require('path')
 
 var g = {
-    get default () { return g__default; },
-    get two () { return two; }
-};
+    get default () { return g__default },
+    get two () { return two }
+}
 
 function add(a, b) { a + b }
 
-function test() {}/**
- * 
- */
+function test() {
+    Object.keys(path).forEach(key => {
+        console.log(key)
+    })
+}
 
-function foo() { console.log('foo') }
+function _bar() {}
+
+_bar()
+function bar() {}
+
+
+
+function foo() { 
+    console.log('foo')
+    bar()
+}
 
 function two() {}
-
 console.log(g.foo, g.two)
 console.log(path)
 
@@ -28,6 +39,6 @@ function one() {
     console.log(3)
 }
 
-exports.default = add;
-exports.test = test;
-exports.one = one;
+exports.default = add
+exports.test = test
+exports.one = one
