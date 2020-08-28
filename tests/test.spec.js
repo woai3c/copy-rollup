@@ -1,8 +1,8 @@
-const rollup = require('../src/rollup')
+const rollup = require('../dist/rollup')
 
 describe('test', () => {
     test('add', done => {
-        rollup('./main.js').then(res => {
+        rollup(__dirname + '/main.js').then(res => {
             console.log(res)
             done()
         })

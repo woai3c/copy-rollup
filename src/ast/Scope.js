@@ -1,15 +1,13 @@
 // 作用域
 class Scope {
-	constructor (options) {
-		options = options || {}
-
+	constructor(options = {}) {
 		this.parent = options.parent
 		this.depth = this.parent ? this.parent.depth + 1 : 0
 		this.names = options.params || []
 		this.isBlockScope = !!options.block
 	}
 
-	add (name, isBlockDeclaration) {
+	add(name, isBlockDeclaration) {
 		if (!isBlockDeclaration && this.isBlockScope) {
 			// it's a `var` or function declaration, and this
 			// is a block scope, so we need to go up
@@ -19,11 +17,11 @@ class Scope {
 		}
 	}
 
-	contains (name) {
+	contains(name) {
 		return !!this.findDefiningScope(name)
 	}
 
-	findDefiningScope (name) {
+	findDefiningScope(name) {
 		if (this.names.includes(name)) {
 			return this
 		}

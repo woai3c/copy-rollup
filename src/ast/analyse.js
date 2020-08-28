@@ -168,9 +168,7 @@ function analyse(ast, magicString, module) {
 			// a++/a--
 			else if (node.type === 'UpdateExpression') {
 				addNode(node.argument, true)
-			}
-
-			else if (node.type === 'CallExpression') {
+			} else if (node.type === 'CallExpression') {
 				node.arguments.forEach(arg => addNode(arg, false))
 			}
 		}

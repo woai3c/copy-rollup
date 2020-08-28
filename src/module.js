@@ -146,27 +146,16 @@ class Module {
 			// skip already-included statements
 			if (statement._included) return
 
-			// skip import declarations
+			// 不需要对导入语句作处理
 			if (statement.type === 'ImportDeclaration') {
-				// unless they're empty, in which case assume we're importing them for the side-effects
-				// THIS IS NOT FOOLPROOF. Probably need /*rollup: include */ or similar
-				if (!statement.specifiers.length) {
-					return this.bundle.fetchModule(statement.source.value, this.path)
-						.then(module => {
-							statement.module = module
-							return module.expandAllStatements()
-						})
-						.then(statements => {
-							allStatements.push.apply(allStatements, statements)
-						})
-				}
-
 				return
 			}
 
 			// skip `export { foo, bar, baz }`
 			if (statement.type === 'ExportNamedDeclaration' && statement.specifiers.length) {
 				// but ensure they are defined, if this is the entry module
+				// export { foo, bar, baz }
+				// 遇到这样的语句，如果是从其他模块引入的函数，则会去对应的模块加载函数，
 				if (isEntryModule) {
 					return this.expandStatement(statement)
 						.then(statements => {
@@ -177,6 +166,7 @@ class Module {
 				return
 			}
 
+			// 剩下的其他类型语句则要添加到 allStatements 中，以待在 bundle.generate() 中生成
 			// include everything else
 			return this.expandStatement(statement)
 				.then(statements => {
@@ -198,6 +188,7 @@ class Module {
 		const dependencies = Object.keys(statement._dependsOn)
 
 		return sequence(dependencies, name => {
+			// define() 将从其他模块中引入的函数加载进来
 			return this.define(name).then(definition => {
 				result.push.apply(result, definition)
 			})

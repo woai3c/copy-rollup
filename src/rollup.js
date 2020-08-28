@@ -1,7 +1,7 @@
 const Bundle = require('./bundle')
 const fs = require('fs')
 
-function rollup(entry, options) {
+function rollup(entry, options = {}) {
     const bundle = new Bundle({ entry, ...options })
     return bundle.build().then(() => {
         return {

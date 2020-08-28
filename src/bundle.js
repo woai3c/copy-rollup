@@ -54,9 +54,11 @@ class Bundle {
             if (!importer) {
                 route = importee
             } else {
+				// 绝对路径
 				if (path.isAbsolute(importee)) {
 					route = importee
 				} else if (importee[0] == '.') {
+					// 相对路径
 					// 获取 importer 的目录，从而找到 importee 的绝对路径
 					route = path.resolve(path.dirname(importer), importee.replace(/\.js$/, '') + '.js')
 				}
@@ -75,7 +77,7 @@ class Bundle {
 					resolve(module)
 				})
 			} else {
-				// 不以 . 开头的路径则是外部模块
+				// 没有找到路径则是外部模块
 				const module = new ExternalModule(importee)
 				this.externalModules.push(module)
 				this.modules[importee] = module
@@ -87,6 +89,7 @@ class Bundle {
     generate(options = {}) {
 		let magicString = new MagicString.Bundle({ separator: '' })
 		// Determine export mode - 'default', 'named', 'none'
+		// 导出模式
 		let exportMode = this.getExportMode(options.exports)
 		let previousMargin = 0
 
