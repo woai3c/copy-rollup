@@ -10,7 +10,7 @@ const replaceIdentifiers = require('./utils/replaceIdentifiers')
 class Bundle {
     constructor(options = {}) {
         // 防止用户省略 .js 后缀
-        this.entryPath = path.resolve(__dirname, options.entry.replace(/\.js$/, '') + '.js')
+        this.entryPath = path.resolve(options.entry.replace(/\.js$/, '') + '.js')
         // 获取入口文件的目录
         this.base = path.dirname(this.entryPath)
         // 入口模块
