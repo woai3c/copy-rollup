@@ -1,1 +1,1 @@
-实现 rollup 打包和 tree-shaking 功能
+研究 rollup 打包以及 tree-shaking 原理
