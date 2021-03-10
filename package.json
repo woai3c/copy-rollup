@@ -4,7 +4,8 @@
   "description": "拷贝自 rollup 初版源码，并对其进行了部分修改",
   "main": "index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "rollup --config"
   },
   "repository": {
     "type": "git",
@@ -21,5 +22,8 @@
     "acorn": "^8.0.1",
     "magic-string": "^0.25.7"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^17.1.0",
+    "rollup": "^2.41.0"
+  }
 }

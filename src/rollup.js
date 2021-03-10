@@ -6,7 +6,7 @@ function rollup(entry, options = {}) {
     return bundle.build().then(() => {
         return {
             generate: options => bundle.generate(options),
-            wirte(dest, options = {}) {
+            write(dest, options = {}) {
                 const { code } = bundle.generate({
 					dest,
 					format: options.format,
